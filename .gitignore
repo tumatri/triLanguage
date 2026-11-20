@@ -8,3 +8,5 @@ dist/
 
 # graphify output (local analysis, not source code)
 graphify-out/
+
+.next/
