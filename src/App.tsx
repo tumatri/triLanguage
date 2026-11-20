@@ -3,8 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import Layout from './components/Layout';
-import LoginPage from './features/auth/LoginPage';
-import BootstrapPage from './features/auth/BootstrapPage';
+import AuthPage from './features/auth/AuthPage';
 import DashboardPage from './features/notebooks/DashboardPage';
 import NotebooksPage from './features/notebooks/NotebooksPage';
 import SettingsPage from './features/settings/SettingsPage';
@@ -19,7 +18,7 @@ const queryClient = new QueryClient({
   }
 });
 
-/** Show login or bootstrap depending on whether any owner exists */
+/** Decide which auth page to show based on whether an owner exists */
 function AuthGate() {
   const { authenticated, loading } = useAuth();
 
@@ -35,12 +34,12 @@ function AuthGate() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Not authenticated — decide which page to show
-  return <LoginPageGate />;
+  return <AuthModeGate />;
 }
 
-function LoginPageGate() {
-  const [mode, setMode] = useState<'bootstrap' | 'login' | 'checking'>('checking');
+function AuthModeGate() {
+  const [mode, setMode] = useState<'bootstrap' | 'login'>('login');
+  const { refresh } = useAuth();
 
   useEffect(() => {
     fetch('/api/auth/bootstrap')
@@ -49,19 +48,12 @@ function LoginPageGate() {
       .catch(() => setMode('login'));
   }, []);
 
-  if (mode === 'checking') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Đang tải...</p>
-      </div>
-    );
-  }
-
-  if (mode === 'bootstrap') {
-    return <BootstrapPage onBootstrapped={() => window.location.href = '/dashboard'} />;
-  }
-
-  return <LoginPage onLogin={() => window.location.href = '/dashboard'} />;
+  return (
+    <AuthPage
+      canBootstrap={mode === 'bootstrap'}
+      onAuth={() => refresh().then(() => { window.location.href = '/dashboard'; })}
+    />
+  );
 }
 
 export default function App() {
@@ -75,7 +67,7 @@ export default function App() {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <DashboardPage />
+                <Layout><DashboardPage /></Layout>
               </ProtectedRoute>
             }
           />
@@ -83,7 +75,7 @@ export default function App() {
             path="/notebooks"
             element={
               <ProtectedRoute>
-                <NotebooksPage />
+                <Layout><NotebooksPage /></Layout>
               </ProtectedRoute>
             }
           />
@@ -91,7 +83,7 @@ export default function App() {
             path="/settings"
             element={
               <ProtectedRoute>
-                <SettingsPage />
+                <Layout><SettingsPage /></Layout>
               </ProtectedRoute>
             }
           />
@@ -101,7 +93,7 @@ export default function App() {
   );
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: { children: ReactNode }) {
   const { authenticated, loading } = useAuth();
 
   if (loading) {
