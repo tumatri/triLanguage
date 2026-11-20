@@ -1,12 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import Layout from './components/Layout';
 import LoginPage from './features/auth/LoginPage';
 import BootstrapPage from './features/auth/BootstrapPage';
 import DashboardPage from './features/notebooks/DashboardPage';
 import NotebooksPage from './features/notebooks/NotebooksPage';
 import SettingsPage from './features/settings/SettingsPage';
+import { useAuth } from './hooks/useAuth';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,35 +19,102 @@ const queryClient = new QueryClient({
   }
 });
 
-function App() {
-  const [authed, setAuthed] = useState(false);
+/** Show login or bootstrap depending on whether any owner exists */
+function AuthGate() {
+  const { authenticated, loading } = useAuth();
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-500">Đang kiểm tra phiên...</p>
+      </div>
+    );
+  }
+
+  if (authenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Not authenticated — decide which page to show
+  return <LoginPageGate />;
+}
+
+function LoginPageGate() {
+  const [mode, setMode] = useState<'bootstrap' | 'login' | 'checking'>('checking');
+
+  useEffect(() => {
+    fetch('/api/auth/bootstrap')
+      .then(r => r.json())
+      .then(data => setMode(data.can_bootstrap ? 'bootstrap' : 'login'))
+      .catch(() => setMode('login'));
+  }, []);
+
+  if (mode === 'checking') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-500">Đang tải...</p>
+      </div>
+    );
+  }
+
+  if (mode === 'bootstrap') {
+    return <BootstrapPage onBootstrapped={() => window.location.href = '/dashboard'} />;
+  }
+
+  return <LoginPage onLogin={() => window.location.href = '/dashboard'} />;
+}
+
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/login" element={<LoginPage onLogin={() => setAuthed(true)} />} />
-            <Route path="/bootstrap" element={<BootstrapPage onBootstrapped={() => setAuthed(true)} />} />
-            <Route path="/" element={
-              authed 
-                ? <Navigate to="/dashboard" replace /> 
-                : <Navigate to="/login" replace />
-            } />
-            <Route path="/dashboard" element={
-              authed ? <DashboardPage /> : <Navigate to="/login" replace />
-            } />
-            <Route path="/notebooks" element={
-              authed ? <NotebooksPage /> : <Navigate to="/login" replace />
-            } />
-            <Route path="/settings" element={
-              authed ? <SettingsPage /> : <Navigate to="/login" replace />
-            } />
-          </Routes>
-        </Layout>
+        <Routes>
+          <Route path="/" element={<AuthGate />} />
+          <Route path="/login" element={<AuthGate />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notebooks"
+            element={
+              <ProtectedRoute>
+                <NotebooksPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
       </BrowserRouter>
     </QueryClientProvider>
   );
 }
 
-export default App;
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { authenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-500">Đang kiểm tra phiên...</p>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
