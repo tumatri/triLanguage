@@ -1,0 +1,8 @@
+[vars]
+APP_ORIGIN = "http://localhost:5173"
+SESSION_TTL_SECONDS = 86400
+FSRS_VERSION = "FSRS-6"
+FSRS_DESIRED_RETENTION = 0.9
+
+[limits]
+cpu_ms = 10000

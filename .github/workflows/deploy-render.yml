@@ -1,0 +1,49 @@
+name: Deploy Backend to Render
+
+# Manual trigger only — backend has secrets and needs real hosting
+on:
+  workflow_dispatch:
+    inputs:
+      render_service_id:
+        description: 'Render Service ID (from dashboard)'
+        required: true
+      git_commit:
+        description: 'Git commit SHA to deploy (defaults to latest)'
+        required: false
+        default: ''
+
+jobs:
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install & Build
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npm run build
+
+      - name: Deploy to Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          service_id="${{ github.event.inputs.render_service_id }}"
+          # Create deployment via Render API
+          response=$(curl -s -X POST "https://api.render.com/v1/services/${service_id}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"git": {"branch": "${{ github.ref_name }}", "commit_sha": "${{ github.event.inputs.git_commit }}"}, "env_vars": [{"key": "NODE_ENV", "value": "production"}]}')
+          echo "$response"
+          if echo "$response" | grep -q '"id"'; then
+            echo "Deployment initiated successfully"
+          else
+            echo "Deployment failed: $response" >&2
+            exit 1
+          fi
