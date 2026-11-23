@@ -1,15 +1,15 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ApiClient } from '../../lib/api';
-import type { ReactNode } from 'react';
 
 type Tab = 'login' | 'register';
 
 interface Props {
   canBootstrap?: boolean;
-  onAuth: () => void;
 }
 
-export default function AuthPage({ canBootstrap = false, onAuth }: Props) {
+export default function AuthPage({ canBootstrap = false }: Props) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>(canBootstrap ? 'register' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,8 +34,10 @@ export default function AuthPage({ canBootstrap = false, onAuth }: Props) {
 
     setLoading(true);
     try {
+      // POST /api/auth/bootstrap handles both register AND login in one endpoint
       await ApiClient.post('/auth/bootstrap', { email, password });
-      onAuth();
+      // Soft navigation — SPA style, no full page reload, cookie stays intact
+      navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || (tab === 'login' ? 'Đăng nhập thất bại' : 'Không thể tạo tài khoản'));
@@ -99,6 +101,7 @@ export default function AuthPage({ canBootstrap = false, onAuth }: Props) {
                 id="email"
                 type="email"
                 required
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
@@ -115,6 +118,7 @@ export default function AuthPage({ canBootstrap = false, onAuth }: Props) {
                 type="password"
                 required
                 minLength={8}
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
@@ -132,6 +136,7 @@ export default function AuthPage({ canBootstrap = false, onAuth }: Props) {
                   type="password"
                   required
                   minLength={8}
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
@@ -152,9 +157,7 @@ export default function AuthPage({ canBootstrap = false, onAuth }: Props) {
           </button>
 
           <p className="text-center text-xs text-gray-400">
-            {tab === 'login'
-              ? 'Chưa có tài khoản? '
-              : 'Đã có tài khoản? '}
+            {tab === 'login' ? 'Chưa có tài khoản? ' : 'Đã có tài khoản? '}
             <button
               type="button"
               onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(null); }}

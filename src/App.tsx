@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
@@ -39,19 +39,17 @@ function AuthGate() {
 
 function AuthModeGate() {
   const [mode, setMode] = useState<'bootstrap' | 'login'>('login');
-  const { refresh } = useAuth();
 
   useEffect(() => {
     fetch('/api/auth/bootstrap')
       .then(r => r.json())
-      .then(data => setMode(data.can_bootstrap ? 'bootstrap' : 'login'))
+      .then((data: { can_bootstrap: boolean }) => setMode(data.can_bootstrap ? 'bootstrap' : 'login'))
       .catch(() => setMode('login'));
   }, []);
 
   return (
     <AuthPage
       canBootstrap={mode === 'bootstrap'}
-      onAuth={() => refresh().then(() => { window.location.href = '/dashboard'; })}
     />
   );
 }

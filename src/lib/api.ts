@@ -26,7 +26,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers['X-CSRF-Token'] = generateCsrfToken();
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers, credentials: 'include' });
 
   if (!response.ok) {
     let data: { error?: string; details?: unknown } = {};
