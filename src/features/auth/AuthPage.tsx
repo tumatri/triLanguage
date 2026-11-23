@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ApiClient } from '../../lib/api';
 
 type Tab = 'login' | 'register';
@@ -9,7 +8,6 @@ interface Props {
 }
 
 export default function AuthPage({ canBootstrap = false }: Props) {
-  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>(canBootstrap ? 'register' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,10 +32,9 @@ export default function AuthPage({ canBootstrap = false }: Props) {
 
     setLoading(true);
     try {
-      // POST /api/auth/bootstrap handles both register AND login in one endpoint
       await ApiClient.post('/auth/bootstrap', { email, password });
-      // Soft navigation — SPA style, no full page reload, cookie stays intact
-      navigate('/dashboard', { replace: true });
+      // Hard redirect — bypasses any router issues, ensures fresh auth state load
+      window.location.href = '/dashboard';
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || (tab === 'login' ? 'Đăng nhập thất bại' : 'Không thể tạo tài khoản'));
