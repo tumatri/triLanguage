@@ -4,6 +4,7 @@ import * as crypto from 'node:crypto';
 
 export const config = { runtime: 'nodejs' };
 
+/** Consistent HMAC-SHA256 hash — NO prefix (matches login.ts) */
 function hashToken(token: string, secret: string): string {
   return crypto.createHmac('sha256', secret).update(token).digest('hex');
 }
@@ -13,7 +14,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const match = req.headers.cookie?.match(/session_token=([^;]*)/);
   const token = match?.[1];
-  if (!token) return res.status(401).json({ error: 'No session' });
+  if (!token) {
+    // No cookie — return 200 with authenticated=false (not 401)
+    // so the frontend can distinguish "no session" from "invalid session"
+    return res.json({ authenticated: false });
+  }
 
   const url = process.env.SUPABASE_URL!;
   const key = process.env.SUPABASE_SECRET_KEY!;
@@ -29,6 +34,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isValid = Array.isArray(data) && data.length > 0;
     return res.json({ authenticated: isValid });
   } catch {
-    return res.status(500).json({ error: 'Check failed' });
+    return res.json({ authenticated: false });
   }
 }

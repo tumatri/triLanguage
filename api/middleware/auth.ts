@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { randomBytes, pbkdf2Sync, createHmac } from 'crypto';
 
 const SESSION_COOKIE_NAME = 'session_token';
-const TOKEN_HASH_PREFIX = 'tri:';
 
 /** Parse session cookie from request */
 export function getSessionCookie(req: NextApiRequest): string | undefined {
@@ -33,11 +32,11 @@ export function clearSessionCookie(res: NextApiResponse): void {
   );
 }
 
-/** Hash a token using HMAC-SHA256 for secure comparison */
+/** Hash a token using HMAC-SHA256 for secure comparison — NO prefix */
 export async function hashToken(token: string, secret: string): Promise<string> {
   const hmac = createHmac('sha256', secret);
   hmac.update(token);
-  return TOKEN_HASH_PREFIX + hmac.digest('hex');
+  return hmac.digest('hex');
 }
 
 /** Generate a random hex token */

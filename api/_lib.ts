@@ -19,11 +19,13 @@ export function getSupabase() {
 /** Force PostgREST schema reload on cache miss */
 async function forceSchemaReload() {
   if (!SUPABASE_URL || !SECRET_KEY) return;
+  const h = { apikey: SECRET_KEY, Authorization: `Bearer ${SECRET_KEY}` };
   await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/users?select=id&limit=0`, { headers: { apikey: SECRET_KEY, Authorization: `Bearer ${SECRET_KEY}` } }).catch(() => {}),
-    fetch(`${SUPABASE_URL}/rest/v1/sessions?select=id&limit=0`, { headers: { apikey: SECRET_KEY, Authorization: `Bearer ${SECRET_KEY}` } }).catch(() => {}),
-    fetch(`${SUPABASE_URL}/rest/v1/notebooks?select=id&limit=0`, { headers: { apikey: SECRET_KEY, Authorization: `Bearer ${SECRET_KEY}` } }).catch(() => {}),
-    fetch(`${SUPABASE_URL}/rest/v1/cards?select=id&limit=0`, { headers: { apikey: SECRET_KEY, Authorization: `Bearer ${SECRET_KEY}` } }).catch(() => {}),
+    fetch(`${SUPABASE_URL}/rest/v1/users?select=id&limit=0`, { headers: h }).catch(() => {}),
+    fetch(`${SUPABASE_URL}/rest/v1/sessions?select=id&limit=0`, { headers: h }).catch(() => {}),
+    fetch(`${SUPABASE_URL}/rest/v1/notebooks?select=id&limit=0`, { headers: h }).catch(() => {}),
+    fetch(`${SUPABASE_URL}/rest/v1/cards?select=id&limit=0`, { headers: h }).catch(() => {}),
+    fetch(`${SUPABASE_URL}/rest/v1/card_progress?select=id&limit=0`, { headers: h }).catch(() => {}),
   ]);
 }
 
@@ -37,7 +39,7 @@ export function getSessionToken(req: NextApiRequest): string | null {
   return cookies['session_token'] ?? null;
 }
 
-/** Hash a token using HMAC-SHA256 */
+/** Hash a token using HMAC-SHA256 — NO prefix, consistent with login/check */
 export function hashToken(token: string, secret: string): string {
   return crypto.createHmac('sha256', secret).update(token).digest('hex');
 }

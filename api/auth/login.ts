@@ -1,9 +1,11 @@
 // api/auth/login.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import * as crypto from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
 
 export const config = { runtime: 'nodejs' };
+
+const SUPABASE_URL = process.env.SUPABASE_URL!;
+const SECRET_KEY = process.env.SUPABASE_SECRET_KEY!;
 
 function hashPassword(password: string, salt: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -13,6 +15,7 @@ function hashPassword(password: string, salt: string): Promise<string> {
   });
 }
 
+/** Same hash function as check.ts — no prefix */
 function hashToken(token: string, secret: string): string {
   return crypto.createHmac('sha256', secret).update(token).digest('hex');
 }
@@ -33,14 +36,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { email, password } = body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_SECRET_KEY!;
-  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const headers = { apikey: SECRET_KEY, Authorization: `Bearer ${SECRET_KEY}` };
 
   // Find user
-  const userR = await fetch(`${url}/rest/v1/users?select=id,email,password_hash,password_salt&email=eq.${encodeURIComponent(email)}`, { headers });
-  const userData = await userR.json();
-  const user = Array.isArray(userData) ? userData[0] : null;
+  let user: { id: string; email: string; password_hash: string; password_salt: string } | null = null;
+  try {
+    const userR = await fetch(`${SUPABASE_URL}/rest/v1/users?select=id,email,password_hash,password_salt&email=eq.${encodeURIComponent(email)}`, { headers });
+    const userData = await userR.json() as unknown[];
+    user = (userData as typeof user[])[0] ?? null;
+  } catch (e) {
+    console.error('[login] user lookup error:', e);
+    return res.status(500).json({ error: 'Service unavailable' });
+  }
+
   if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
   const computedHash = await hashPassword(password, user.password_salt);
@@ -54,13 +62,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const createdAt = nowISO();
   const tokenHash = hashToken(rawToken, process.env.SESSION_SECRET!);
 
-  const sessR = await fetch(`${url}/rest/v1/sessions`, {
-    method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: sessionId, user_id: user.id, token_hash: tokenHash, created_at: createdAt, expires_at: expiresAt, last_seen_at: createdAt })
-  });
-  const sessData = await sessR.json();
-  if (!sessR.ok) return res.status(500).json({ error: sessData?.message || 'Session creation failed' });
+  try {
+    const sessR = await fetch(`${SUPABASE_URL}/rest/v1/sessions`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: sessionId, user_id: user.id, token_hash: tokenHash, created_at: createdAt, expires_at: expiresAt, last_seen_at: createdAt }),
+    });
+    const sessData = await sessR.json();
+    if (!sessR.ok) return res.status(500).json({ error: sessData?.message || 'Session creation failed' });
+  } catch (e) {
+    console.error('[login] session create error:', e);
+    return res.status(500).json({ error: 'Service unavailable' });
+  }
 
   res.setHeader('Set-Cookie',
     `session_token=${rawToken}; HttpOnly; Secure; SameSite=Lax; Path=/; Expires=${new Date(Date.now() + ttlSeconds * 1000).toUTCString()}`
