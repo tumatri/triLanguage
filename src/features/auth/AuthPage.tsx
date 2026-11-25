@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiClient } from '../../lib/api';
 
 type Tab = 'login' | 'register';
@@ -14,6 +14,12 @@ export default function AuthPage({ canBootstrap = false }: Props) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // The bootstrap check is asynchronous.  Do not leave the registration form
+  // selected if its result says that an owner already exists.
+  useEffect(() => {
+    if (!canBootstrap) setTab('login');
+  }, [canBootstrap]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,7 +38,14 @@ export default function AuthPage({ canBootstrap = false }: Props) {
 
     setLoading(true);
     try {
-      await ApiClient.post('/auth/bootstrap', { email, password });
+      if (tab === 'login') {
+        await ApiClient.post('/auth/login', { email, password });
+      } else {
+        await ApiClient.post('/auth/bootstrap', { email, password });
+        // Bootstrap creates the account only; login is what creates the
+        // authenticated session cookie used by protected routes.
+        await ApiClient.post('/auth/login', { email, password });
+      }
       // Hard redirect — bypasses any router issues, ensures fresh auth state load
       window.location.href = '/dashboard';
     } catch (err: unknown) {
@@ -56,8 +69,8 @@ export default function AuthPage({ canBootstrap = false }: Props) {
           </p>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex rounded-lg bg-gray-100 p-1">
+        {/* Registration is available only while no owner account exists. */}
+        {canBootstrap && <div className="flex rounded-lg bg-gray-100 p-1">
           <button
             type="button"
             onClick={() => { setTab('login'); setError(null); }}
@@ -80,7 +93,7 @@ export default function AuthPage({ canBootstrap = false }: Props) {
           >
             Đăng ký
           </button>
-        </div>
+        </div>}
 
         <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow">
           {error && (
@@ -153,7 +166,7 @@ export default function AuthPage({ canBootstrap = false }: Props) {
               : (tab === 'login' ? 'Đăng nhập' : 'Tạo tài khoản')}
           </button>
 
-          <p className="text-center text-xs text-gray-400">
+          {canBootstrap && <p className="text-center text-xs text-gray-400">
             {tab === 'login' ? 'Chưa có tài khoản? ' : 'Đã có tài khoản? '}
             <button
               type="button"
@@ -162,7 +175,7 @@ export default function AuthPage({ canBootstrap = false }: Props) {
             >
               {tab === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}
             </button>
-          </p>
+          </p>}
         </form>
       </div>
     </div>

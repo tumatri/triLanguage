@@ -73,8 +73,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (existingUser) {
-    // Existing user — just log them in
-    return res.status(200).json({ id: existingUser.id, email, is_new: false, is_owner: !!existingUser.is_owner });
+    // Account creation must never double as authentication.  In particular,
+    // do not report success before the password has been verified by /login.
+    return res.status(409).json({ error: 'Tài khoản này đã tồn tại. Vui lòng đăng nhập.' });
   }
 
   // Step 2: Create new user (first becomes owner)
